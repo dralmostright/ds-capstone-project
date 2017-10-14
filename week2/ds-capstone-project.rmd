@@ -1,0 +1,147 @@
+---
+title: "Coursera DS Capstone Project"
+author: "Suman Adhikari"
+date: "October 13, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. Hence in this project we will start with the basics, analyzing a large corpus of text documents to discover the structure in the data and how words are put together. We will cover cleaning and analyzing text data, then building and sampling from a predictive text model.
+
+In this capstone will work on understanding and building predictive text models like those used by SwiftKey like, When someone types:
+
+I went to the
+
+the keyboard presents three options for what the next word might be. For example, the three words might be gym, store, restaurant.
+
+## Load the required libraries
+The necessary packages for processing documents/corpus, exploratory analysis and bulding model are loaded.
+```{r, message=FALSE, results='hide'}
+libs <- c("ggplot2", "randomForest", "caret", "tm","SnowballC")
+lapply(libs ,require, character.only=TRUE)
+```
+
+## Load the Data
+Data used for this Capstone Project was obtained from the below URL:
+
+* [Data Set](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+
+The data had been already download to working directory and extracted. We will be using the English Language documents for our analysis.
+
+```{r}
+setwd("/R/workspace/capstoneProject/dataset/final/en_US")
+## List the documents in our working directory
+dir()
+```
+
+## Getting and Cleaning Data
+As R is case sensitive, we need to convert the case of whole corpus as *Case* is not equal to *case*.
+However, there is a tolower transformation, it is not a part of the standard tm transformations. For this reason, we have to convert tolower into a transformation that can handle a corpus object properly by using content_transformer.
+```{r}
+toLower <- function(corpus){
+  corpus <- tm_map(docs.corpus,content_transformer(tolower))
+  return(corpus)
+}
+```
+
+Words like I'll, I'm i.e contractions are heavily used in english as they represent two words. Hence to fix such condition lets develop a function which splits the words 'i'll' to 'i will', 'i'am' to 'i am' etc.
+```{r}
+mapFun <- content_transformer(function(x, src, dest) {return (gsub(src, dest, x))})
+completeCase <- function(inputCorpus){
+  tempCor <- tm_map(inputCorpus, mapFun, src="'ll", dest=" will")
+  inputCorpus <- tm_map(inputCorpus, mapFun, src="'ve", dest=" have")
+  inputCorpus <- tm_map(inputCorpus, mapFun, src="n't", dest=" not")
+  inputCorpus <- tm_map(inputCorpus, mapFun, src="'m", dest=" am")
+  inputCorpus <- tm_map(inputCorpus, mapFun, src="'d", dest=" had")
+  inputCorpus <- tm_map(inputCorpus, mapFun, src="'s", dest=" is")
+  inputCorpus <- tm_map(inputCorpus, mapFun, src="'re", dest=" are");
+  return (inputCorpus)
+}
+```
+As the corpus is huge and contain many words that have a common root for example: offer, offered and offering.  Hence we will stem the corpus using tm_map function. 
+```{r}
+stemCorpus <- function(corpus){
+  corpus <- tm_map(corpus, stemDocument)
+  return(corpus)
+}
+```
+
+All extraneous whitespaces using the stripWhitespace transformation:
+
+```{r}
+rmWhSpace <- function(corpus){
+  corpus <- tm_map(corpus, stripWhitespace)
+  return(corpus)
+}
+```
+
+The documents we are going to use are big. Hence processing of those documents in normal PC takes siginification time. So we will select desired sample that can be processed by normal PC from the original documents. We will be using random sampling Algorithm to get sample document.
+```{r, message=FALSE, warning=FALSE}
+## Set the seed for reproducibility
+set.seed(2017)
+
+## Function to get sample docs
+makeSample <- function(directory){
+fList <- list.files(directory, full.names = TRUE)
+samlist <- lapply(fList, selectSample, sampleSize=10)
+return(samlist)
+}
+
+## Function to get the sample lines from docs
+selectSample <- function(file, sampleSize){
+## Open file for reading in text mode
+conn <- file(file, open="r")
+## Read the lines in memory
+lines <- readLines(conn)
+## Length of the line 
+fileLength <- length(lines)
+## Get the random Indexes
+randIndex <- sample(1:fileLength, sampleSize)
+## Select the lines corresponding to random index
+sampleFile <- lines[randIndex]
+close(conn)
+return(sampleFile)
+}
+```
+
+With developing the function, now we can sample the document to desired size that can be processed by our PC.
+```{r, message=FALSE, warning=FALSE}
+corpus.List <- makeSample("/R/workspace/capstoneProject/dataset/final/en_US")
+coprus.docs <- as.VCorpus(corpus.List)
+coprus.docs
+```
+
+## Exploratory Data Analysis
+```{r}
+fileInfo <- function(inputFile,directory) {
+## Set the working directory
+setwd(directory)
+## Get the size of the file in MB
+fSize <- file.info(inputFile)[1]/(1024*1024)
+## Open file for reading in text mode
+conn <- file(inputFile, open="r")
+## Read the lines in memory
+lines <- readLines(conn)
+## Calculate the total human readable charactes
+nChars <- lapply(lines, nchar)
+## Get the maximum value for nChars
+maxChars <- which.max(nChars)
+## Get the Total words for the file
+nWords <- sum(sapply(strsplit(lines, "\\s+"),length))
+## Close connection
+close(conn)
+## Retrun the summary
+return(c(inputFile, round(fSize,2), length(lines), maxChars, nWords))
+}
+
+
+fList <- list.files("/R/workspace/capstoneProject/dataset/final/en_US")
+summaryInfo <- lapply(fList,fileInfo,directory="/R/workspace/capstoneProject/dataset/final/en_US")
+summaryInfo <- data.frame(matrix(unlist(summaryInfo),length(fList), byrow=T))
+colnames(summaryInfo) <- c("File.Name", "Size.MB", "Total.Lines", "Max.Line.Length", "No.Words")
+summaryInfo
+```
