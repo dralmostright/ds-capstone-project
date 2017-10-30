@@ -1,7 +1,7 @@
 ---
-title: "Coursera DS Capstone Project: Milestone Report"
+title: "Coursera DS Capstone Project"
 author: "Suman Adhikari"
-date: "October 29, 2017"
+date: "October 13, 2017"
 output:
   html_document: default
   pdf_document: default
@@ -12,11 +12,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Executive Summary
-Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. Hence in this Coursera DataScience Specialization Capstone Project I am motivated to address the problem by starting with analyzing a large corpus of text documents to discover the structure in the data and how words are put together, then sampling and building a predictive text model.
+Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. Hence in this Coursera Capstone project I am motivated to address the problem by starting with analyzing a large corpus of text documents to discover the structure in the data and how words are put together, then sampling and building from a predictive text model.
 
 This milestone report is part of Coursera Data Science Specialization: Capstone project which delineate major features of the training data with exploratory data analysis and summarizes plans for creating the predictive model.
 
-**Source code of each user define function & plots used in Code chunks are hidden, hence can be viewed in [Appendix-I](#appendix---i-user-defined-functions) and [Appendix-II](#appendix--ii-plots).**
+**Source code of each user define function and plots used in Code chunks are set to echo=FALSE , hence can be viewed in [Appendix - I](#appendix---i-user-defined-functions) and [Appendix - II](#appendix--ii-plots).**
 
 ## Load the required libraries
 The necessary packages for processing documents/corpus, exploratory analysis and bulding model are loaded.
@@ -74,7 +74,7 @@ summaryInfo
 rawCorpusSummary("/R/workspace/capstoneProject/dataset/final/en_US")
 ```
 
-The documents we are going to use are big, as we obeserved from *summaryInfo*. Hence processing of those whole documents in normal PC takes siginificant time and leads memory erros. Hence, I will sample the document with 4% of original and proceed. I will use random sampling algorithm to get sample document.
+The documents we are going to use are big, as we obeserved from *summaryInfo*. Hence processing of those whole documents in normal PC takes siginificant time and memory. Hence to I will sample the document with 1%~10% of original and proceed. I will be using random sampling algorithm to get sample document.
 ```{r, message=FALSE, warning=FALSE, echo=FALSE}
 ## selectSample take the document checks its total line size & select the sample based on no of lines
 ## Set the seed for reproducibility
@@ -136,23 +136,19 @@ print("Sample docs are processed and wrote to disk.")
 ```{r, message=FALSE, warning=FALSE}
 samplePath <- "/R/workspace/capstoneProject/dataset/final/sample/sam_"
 sourcePath <- "/R/workspace/capstoneProject/dataset/final/en_US"
-makeSample(sourcePath, samplePath, 4)
+#makeSample(sourcePath, samplePath, 1)
 corpusPath <- gsub("sam_","", samplePath)
 ```
 
 The samples are processed and wrote back to disk using function *makeSample*. Now, lets look how our sample is in terms of size, word lenght etc.
 ```{r, message=FALSE, warning=FALSE}
 rawCorpusSummary(corpusPath)
-```
-
-As we saw our sample is good enough to handle by normal PC. So now lets build our [Courpus](https://en.wikipedia.org/wiki/Text_corpus).
-```{r, message=FALSE, warning=FALSE}
 corpus.docs <- VCorpus(DirSource(corpusPath))
 ```
 
 ## Getting and Cleaning Data
 
-The documents that have been used are from various sources like twitter, blog and news. The documents consists of various flaws and profanity like unwanted symbols, contractions, stop words, bad words. Hence our first step is to handle them properly. The tasks I am proforming as part of cleaning text are listed below in bold:
+The documents that have been used are from various sources like twitter, blog and news. The documents may consists of various flaws and profanity like unwanted symbols, contractions, stop words, bad words. Hence our first step should be to handle them properly. The tasks I am proforming as part of text mining are listed below in bold:
 
  * **Changing the case of corpus**
  * **Removing the contractions**
@@ -175,12 +171,11 @@ toLower <- function(corpus){
   return(corpus)
 }
 ```
-```{r}
-corpus.docs <- toLower(corpus.docs)
-```
+
+
 
 ### Handling contractions
-Words like I'll, I'm i.e contractions are heavily used in english as they represent two words. Hence to fix such condition I have developed a function *completeCase* which splits the words 'i'll' to 'i will', 'i'am' to 'i am' etc.
+Words like I'll, I'm i.e contractions are heavily used in english as they represent two words. Hence to fix such condition I have developed a function which splits the words 'i'll' to 'i will', 'i'am' to 'i am' etc.
 ```{r echo=FALSE}
 mapFun <- content_transformer(function(x, src, dest) {return (gsub(src, dest, x))})
 completeCase <- function(inputCorpus){
@@ -197,43 +192,31 @@ completeCase <- function(inputCorpus){
   return (inputCorpus)
 }
 ```
-```{r}
-corpus.docs <- completeCase(corpus.docs)
-```
-
-### Removing unwanted symbols,numbers and punctuations
-In this step I will remove all the unwanted symbols and url's like http, @, #. 
-```{r}
-toSpace <- content_transformer(function(x, pattern) gsub(pattern, " ", x))
-corpus.docs <- tm_map(corpus.docs, toSpace, "(f|ht)tp(s?)://(.*)[.][a-z]+")
-corpus.docs <- tm_map(corpus.docs, toSpace, "@[^\\s]+")
-corpus.docs <- tm_map(corpus.docs, removePunctuation)
-corpus.docs <- tm_map(corpus.docs, removeNumbers)
-```
 
 ### Stemming the corpus
-There are many words in the corpus contain that have a common root for example: *offer*, *offered* and *offering*.  Hence I will stem the corpus using tm_map function. 
-```{r, echo=FALSE}
-corpus.docs <- tm_map(corpus.docs, stripWhitespace)
-```
-```{r}
-corpus.docs <- tm_map(corpus.docs, stemDocument)
-```
+As the corpus is huge and contain many words that have a common root for example: offer, offered and offering.  Hence we will stem the corpus using tm_map function. 
 
 ### Removing bad words and stop words.
-We are imitating natural language, so I think its better to keep the stop words. As removing stop word may make our model more worse.
+We are imitating natural language, so i think its better to keep the stop words. As removing stop word may make our model more worse.
 
 ### Remove extraneous whitespaces
 All extraneous whitespaces are removed using the stripWhitespace transformation:
+
+As we have our sample corpus and developed some functions to polish our corpus, its time to use them in our corpus to clean and polish it.
 ```{r}
+corpus.docs <- toLower(corpus.docs)
+corpus.docs <- completeCase(corpus.docs)
+corpus.docs <- tm_map(corpus.docs, removeNumbers)
+corpus.docs <- tm_map(corpus.docs, removePunctuation)
 corpus.docs <- tm_map(corpus.docs, stripWhitespace)
+corpus.docs <- tm_map(corpus.docs, stemDocument)
 ```
 
 ## Exploratory Data Analysis - II
-After developing tidy and clean corpus our next step is exploring the corpus for distribution of terms and their frequency and n-grams (An n-gram is a contiguous sequence of n items from a given sequence of text or speech. The items can be phonemes, syllables, letters, words or base pairs according to the application [Source : [en.wikipedia.org](https://en.wikipedia.org/wiki/N-gram)]). So in our case items are words. I will use [Term Document Matrix](https://en.wikipedia.org/wiki/Document-term_matrix) for exploring corpus i.e rows represent the document and columns represent terms that appeared in the respective documents.
+Now I have developed our tidy and clean corpus. Next will be exploring the corpus for distribution of terms and their frequency, n-grams and their frequency. I will use Term Document Matrix for exploring corpus i.e rows represend the document and columns represent terms that appeared in the matrix.
 
 ### Creating Term Document matrix
-With preprocessing now I will change the text to quantitative for further analysis using Term Document Matrix(TDM). I will generate TDM for up to 4-gram.
+With preprocessing now I will change the text to quantitative for further analysis using Term Document Matrix.
 
 ```{r , echo=FALSE}
 ## ngramTDM function takes input as corpus and creates ngram Term Document Matrix
@@ -266,18 +249,8 @@ ngramTDM <- function(corpus, start=NULL, stop=NULL){
   return(tdm)
 }
 ```
-```{r}
-## Get unigram TDM
-corpus.uniTDM <- ngramTDM(corpus.docs)
-## Get bigram TDM
-corpus.biTDM <- ngramTDM(corpus.docs,2)
-## Get trigram TDM
-corpus.triTDM <- ngramTDM(corpus.docs,3)
-## Get 4gram TDM
-corpus.fourTDM <- ngramTDM(corpus.docs,4)
-```
 
-After creating Term document matrix using function *ngramTDM* I am interested in Term frequency for each ngarm TDM. I will use *getTermFreq* user defined function, which takes the ngram TDM and retruns Term frequency matrix i.e rows in matrix are terms and columns are frequency. Here I will use the function to get top 20 ngram Term frequency matrix.
+After creating Term document matrix using function *ngramTDM* I am interested in Term frequency for each ngarm TDM. I will use getTermFreq user define function takes the ngram TDM and retruns Term frequency matrix.
 ```{r, echo=FALSE}
 getTermFreq <- function(tdm, threshold=NULL){
 	freqTerm <- rowSums(as.matrix(tdm))
@@ -294,15 +267,13 @@ getTermFreq <- function(tdm, threshold=NULL){
 	return(data)
 }
 ```
+
+Let's create TDM inspect how it looks like.
 ```{r}
-## Get top 20 unigram TFM
-uniTFM <- getTermFreq(corpus.uniTDM, 20)
-## Get top 20 bigram TFM
-biTFM <- getTermFreq(corpus.biTDM, 20)
-## Get top 20 trigram TFM
-triTFM <- getTermFreq(corpus.triTDM, 20)
-## Get top 20 4gram TFM
-fourTFM <- getTermFreq(corpus.fourTDM, 20)
+corpus.uniTDM <- ngramTDM(corpus.docs)
+corpus.biTDM <- ngramTDM(corpus.docs,2)
+corpus.triTDM <- ngramTDM(corpus.docs,3)
+corpus.fourTDM <- ngramTDM(corpus.docs,4)
 ```
 
 ### Mining the TDM
@@ -312,39 +283,100 @@ For example, to get the frequency of occurrence of each word in the corpus, I si
 First let's visualize unigram in plot.
 
 ```{r, echo=FALSE}
+uniTFM <- getTermFreq(corpus.uniTDM, 20)
+
 p <- ggplot(uniTFM, aes(term, value))
 p <- p + geom_bar(stat="identity")
 p <- p + theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(hjust = 0.5))
 p <- p + ylab("Unigram Term Frequency in Corpus")
-p <- p + xlab("Unigram Terms in Corpus") + ggtitle("Unigram Term frequency VS Top 20 term in Corpus")
+p <- p + xlab("Unigram Terms in Corpus") + ggtitle("Unigram Term frequency VS Term in Corpus")
 p
 ```
 
 It can be clearly witnessed form above plot that most frequent words are stop words. As stated earlier I have not removed stop words as we are imitating the NLP. Hence removing stop word may make our model more worse.
 
-Next lets visualize bigram, trigram and 4-gram term frequency matrix.
+Next lets visualize bigram, trigram and 4-gram term document matrix.
 ```{r, echo= FALSE}
+biTFM <- getTermFreq(corpus.biTDM, 20)
 p <- ggplot(biTFM, aes(term, value))
 p <- p + geom_bar(stat="identity")
 p <- p + theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(hjust = 0.5))
 p <- p + ylab("Bigram Term Frequency in Corpus")
-p <- p + xlab("Bigram Terms in Corpus") + ggtitle("Bigram Term frequency VS Top 20 term in Corpus")
+p <- p + xlab("Bigram Terms in Corpus") + ggtitle("Bigram Term frequency VS Term in Corpus")
 p
 
 
+triTFM <- getTermFreq(corpus.triTDM, 20)
 p <- ggplot(triTFM, aes(term, value))
 p <- p + geom_bar(stat="identity")
 p <- p + theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(hjust = 0.5))
 p <- p + ylab("Trigram Term Frequency in Corpus")
-p <- p + xlab("Trigram Terms in Corpus") + ggtitle("Trigram Term frequency VS Top 20 term in Corpus")
+p <- p + xlab("Trigram Terms in Corpus") + ggtitle("Trigram Term frequency VS Term in Corpus")
 p
 
-
+fourTFM <- getTermFreq(corpus.fourTDM, 20)
 p <- ggplot(fourTFM, aes(term, value))
 p <- p + geom_bar(stat="identity")
 p <- p + theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(hjust = 0.5))
 p <- p + ylab("4gram Term Frequency in Corpus")
-p <- p + xlab("4gram Terms in Corpus") + ggtitle("4gram Term frequency VS Top 20 term in Corpus")
+p <- p + xlab("4gram Terms in Corpus") + ggtitle("4gram Term frequency VS Term in Corpus")
+p
+```
+
+## Word coverage
+#### How many unique words do you need in a frequency sorted dictionary to cover 50% of all word instances in the language? 90%?
+To find the solution to this question, I will iterate over our sample data's Frequency Term Matrix and find the required word instances to coverage 50 % and 90 % respectively using function calFreqWordInstance. All user defined functions definition can be found on Appendix - I.
+```{r, echo=FALSE}
+calFreqWordInstance <- function(tfm, threshold){
+wordFreq <- 0
+uniqueCount <- 0
+totalWord <- sum(tfm$value)
+for(i in 1:nrow(tfm)){
+wordFreq <- wordFreq + tfm[i, "value"]
+wordCoverage <-  round((wordFreq/totalWord) * 100, 2)
+if(wordCoverage >= threshold){
+  uniqueCount <- i
+  return(uniqueCount)
+  break
+}
+}
+}
+uniTFM <- getTermFreq(corpus.uniTDM)
+```
+
+The no. of unique words required to cover 50% and 90% of all word instance are *`r calFreqWordInstance(uniTFM, 50)`* and *`r calFreqWordInstance(uniTFM, 90)`* respectively.
+With calculating the no. of unique words required to cover 50% and 90% of all word instance, lets visualize it via plot.
+```{r, echo=FALSE}
+wordPercent <- seq(10, 90, by=10)
+
+totalTermCount <- sum(uniTFM$value)
+wordPerValue <- 0
+wordCount <- 0
+j <- 1
+for(i in 1:nrow(uniTFM)){
+wordCount <- wordCount + uniTFM[i, "value"]
+wordCoverage <- round((wordCount/totalTermCount) * 100,2)
+if (wordCoverage >= wordPercent[j]){
+wordPerValue[j] <- i
+j <- j+ 1
+}
+if(j > 9){
+break
+}
+}
+
+coverageDF <- as.data.frame(wordPercent)
+coverageDF$uniqueWords <- wordPerValue
+y50 <- calFreqWordInstance(uniTFM, 50)
+y90 <- calFreqWordInstance(uniTFM, 90)
+p <- ggplot(coverageDF, aes(wordPercent, uniqueWords)) + geom_point(alpha=0.5) + geom_line()
+p <- p + geom_point(aes(x=50, y=y50), size = 4, colour = "blue", alpha=0.2)
+p <- p + geom_point(aes(x=90, y=y90), size = 4, colour = "red", alpha=0.2)
+p <- p + geom_text(x=50, y=350, label=paste("Word instance required for 50% coverage:",y50), colour= "blue") 
+p <- p + geom_text(x=65, y=4850, label=paste("Word instance required for 90% coverage:", y90), colour= "red")
+p <- p + theme(plot.title = element_text(hjust = 0.5))
+p <- p + ylab("Unique Word Count")
+p <- p + xlab("No of wrods in Corpus in %") + ggtitle("Unique word Count Vs No of wrods in Corpus in %")
 p
 ```
 
@@ -352,20 +384,26 @@ p
 So far there was not so amusing thing i have encountered. But some that have triggred me are:
 
 * Tokenizer was not working with Simple Corpus. As I have created VCorpus as as.VCorpus(FileFromMemory), but the tm function tm_map was was not working. Hence, it was slowing my computation as, first I have to load the files in memory do some sampling and again right back to memory and again load it. 
+* As all must have felt slowness that R is taking time to do computation, so there must be parallelism with tm package and Tokenizer.
 
+## Questions to consider
 
+##Get feedback
+I am planning to use Markov Chain to implement my model. The algoright flow is:
 
-##Plans for Creating a Prediction Algorithm ,Shiny App and Feedback
-* Research to make the sample size bigger and tune response time during search for terms in n-gram.
-* Explore more on datasets and state of arts on current text prediction models modeled by companies like SwiftKey, Stanford, Google. 
-* Develop a text prediction model to predict next word with searching first on n-gram. If no match found, then fallback back to (n-1)-gram. If again no match found the similar iteration is carried out until search is reached to unigram. If still no match found then return randomly selected terms from unigram.
-* And my final step will be to make a fast, accurate, and functional Shiny App where user input will be taken and next possible 3-terms will be displayed.
+* Take the n-gram input
+* search the n-gram in n+1-gram
+    + if no match found
+      * fallback the search to search the ngram by purneing first term of n-gram input in n-gram
+      * repeat step i until n-gram input is 1-gram and database gran is 2-gram 
+    + if still no match found 
+      + randomly select fron 1-gram and retrun word.
 
 My search is slow when the sample size above 5%. So any techniques you can suggest like indexing, parallelizing for search so that the response time is quick. Also, further suggestion for amendment in algorithm to tune response time are welcome.
 
 ## Appendix - I (User defined functions)
 
-1. Function to view attributes of documents
+1. Function to view attributes of the data 
 
 ```{r, message=FALSE, warning=FALSE, eval=FALSE}
 fileInfo <- function(inputFile,directory) {
@@ -491,7 +529,6 @@ completeCase <- function(inputCorpus){
 ```
 
 5. Term Document Matrix
-
 Generate ngram Term Document Matrix
 ```{r, eval=FALSE}
 ## ngramTDM function takes input as corpus and creates ngram Term Document Matrix
@@ -542,6 +579,48 @@ getTermFreq <- function(tdm, threshold=NULL){
 }
 ```
 
+6. Function to get Word frequency required to cover n% of words in corpus.
+```{r, eval=FALSE}
+calFreqWordInstance <- function(tfm, threshold){
+wordFreq <- 0
+uniqueCount <- 0
+totalWord <- sum(tfm$value)
+for(i in 1:nrow(tfm)){
+wordFreq <- wordFreq + tfm[i, "value"]
+wordCoverage <-  round((wordFreq/totalWord) * 100, 2)
+if(wordCoverage >= threshold){
+  uniqueCount <- i
+  return(uniqueCount)
+  break
+}
+}
+}
+```
+
+7. Code to get no. of unique words required to cover 10% to 90% of all word instance.
+```{r , eval=FALSE}
+wordPercent <- seq(10, 90, by=10)
+
+totalTermCount <- sum(uniTFM$value)
+wordPerValue <- 0
+wordCount <- 0
+j <- 1
+for(i in 1:nrow(uniTFM)){
+wordCount <- wordCount + uniTFM[i, "value"]
+wordCoverage <- round((wordCount/totalTermCount) * 100,2)
+if (wordCoverage >= wordPercent[j]){
+wordPerValue[j] <- i
+j <- j+ 1
+}
+if(j > 9){
+break
+}
+}
+
+coverageDF <- as.data.frame(wordPercent)
+coverageDF$uniqueWords <- wordPerValue
+```
+
 ## Appendix -II (Plots)
 
 1. Unigram Plot
@@ -586,5 +665,18 @@ p <- p + geom_bar(stat="identity")
 p <- p + theme(axis.text.x=element_text(angle=45, hjust=1), plot.title = element_text(hjust = 0.5))
 p <- p + ylab("4gram Term Frequency in Corpus")
 p <- p + xlab("4gram Terms in Corpus") + ggtitle("4gram Term frequency VS Term in Corpus")
+p
+```
+
+5. Plot to visualize no of unique words required to cover 10% to 90% word instances.
+```{r, eval=FALSE}
+p <- ggplot(coverageDF, aes(wordPercent, uniqueWords)) + geom_point(alpha=0.5) + geom_line()
+p <- p + geom_point(aes(x=50, y=224), size = 4, colour = "blue", alpha=0.2)
+p <- p + geom_point(aes(x=90, y=4862), size = 4, colour = "red", alpha=0.2)
+p <- p + geom_text(x=50, y=350, label="Word instance required for 50% coverage: 224", colour= "blue") 
+p <- p + geom_text(x=65, y=4850, label="Word instance required for 90% coverage: 4862", colour= "red")
+p <- p + theme(plot.title = element_text(hjust = 0.5))
+p <- p + ylab("Unique Word Count")
+p <- p + xlab("No of wrods in Corpus in %") + ggtitle("Unique word Count Vs No of wrods in Corpus in %")
 p
 ```
