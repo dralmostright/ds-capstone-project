@@ -1,0 +1,22 @@
+---
+title: "Predicted Tooth Growth in Guinea Pigs"
+author: "Suman Adhikari"
+date: "July 14, 2017"
+output: html_document
+---
+
+### Introduction
+Welcome to the "APP Predicted Tooth Growth in Guinea Pigs", that is developed as part of Developing Data Products Course from Coursera.
+
+It is a very basic APP that demonstrates basic skills learned during the course.
+
+The app uses the dataset "ToothGrowth" from R dataset.
+
+### Getting Started with this Web App
+One Side of the App let's you to select the variables i.e the dose level of Vitamin C and other the way the Vitamin was provided to Pigs.
+
+First a model is build and the model is used for predicting the tooth data selected by the end user.
+
+Please select/change the respective Inpput variables to view the change.
+
+Source code for ui.R and server.R files are available on the GitHub.

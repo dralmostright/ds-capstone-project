@@ -1,0 +1,651 @@
+##
+## Load the required libraries
+##
+
+libs <- c("ggplot2","tm","SnowballC","reshape2","RWeka","dplyr")
+lapply(libs ,require, character.only=TRUE)
+
+
+
+##
+## List the documents in our working directory
+##
+
+dir("/R/workspace/capstoneProject/dataset/final/en_US")
+
+
+##
+## Function to view the attributes of the document in give directory
+## inputfile : name of the file
+## directory : the directory where the file resides
+## 
+## The function returns 
+## 		the size of the document in mb
+## 		no of lines in the in the document
+##		no of character in line whose length is max for the document
+##		total no of words in the document
+##
+
+
+fileInfo <- function(inputFile,directory) {
+	## Set the working directory
+		setwd(directory)
+	
+	## Get the size of the file in MB
+		fSize <- file.info(inputFile)[1]/(1024*1024)
+
+	## Open file for reading in text mode
+		conn <- file(inputFile, open="r", encoding = "UTF-8")
+
+	## Read the lines in memory
+		lines <- readLines(conn, skipNul = TRUE, encoding = "UTF-8")
+
+	## Calculate the total human readable charactes
+		nChars <- lapply(lines, nchar)
+	
+	## Get the maximum value for nChars
+		maxChars <- nChars[which.max(nChars)][[1]]
+
+	## Get the Total words for the file
+		nWords <- sum(sapply(strsplit(lines, "\\s+"),length))
+
+	## Close connection
+		close(conn)
+
+	## Retrun the summary
+		return(c(inputFile, round(fSize,2), length(lines), maxChars, nWords))
+}
+
+##
+## Function to view the attributes of documents with in a directory
+## directory : name of the directory where the documents resides
+##	
+##	The functions returns for each document with in the given directory
+## 
+## The function returns 
+## 		the size of the document in mb
+## 		no of lines in the in the document
+##		no of character in line whose length is max for the document
+##		total no of words in the document
+##
+
+rawCorpusSummary <- function(directory){
+	fList <- list.files(directory)
+	summaryInfo <- lapply(fList,fileInfo,directory=directory)
+	summaryInfo <- data.frame(matrix(unlist(summaryInfo),length(fList), byrow=T))
+	colnames(summaryInfo) <- c("File.Name", "Size.MB", "Total.Lines", "Max.Line.Length", "No.Words")
+	summaryInfo
+}
+
+##
+##
+#### VIEW DOCUMENTS ATTRIBUES
+
+#rawCorpusSummary("/R/workspace/capstoneProject/dataset/final/en_US")
+
+##
+## Function to sample the lines on each document. As huge files can't be handled easily by normal PC.
+## file : the name of the file, the filename should be absolute.
+## sampleSize : the required sample size in percentage
+## samplePath : the absolute path where the processed sample should be written and save
+##
+##
+
+## Set the seed for reproducibility
+set.seed(545)
+
+selectSample <- function(file, sampleSize, samplePath){
+	
+	## Open file for reading in text mode
+		conn <- file(file, open="r", encoding = "UTF-8")
+	
+	## Read the lines in memory
+		lines <- readLines(conn, skipNul = TRUE, encoding = "UTF-8")
+
+	## Get no of lines for the file 
+		fileLength <- length(lines)
+
+	## Get the sample lines size based on the total lines on file
+		sampleSize <- round((sampleSize/100) * fileLength)
+
+	## Get the random Indexes
+		randIndex <- sample(1:fileLength, sampleSize, replace=TRUE)
+
+	## Select the lines corresponding to random index
+		sampleFile <- lines[randIndex]
+
+	## Prepare the sampleFile to write back to disk
+	## Get the name of File
+		samFileName <- paste0(samplePath, tail(strsplit(file,"/")[[1]],1))
+	
+	## Generate file name for sample 
+		sampleTemPath <- gsub("sam_","", samplePath)
+
+	## Check the directory 
+	## If directory exits check also if file exits & If file exits remove the file
+	if(dir.exists(sampleTemPath)){
+		if(file.exists(samFileName)){
+		file.remove(samFileName)
+		}
+	}
+	
+	## Create the sample path directory
+	else {
+		dir.create(sampleTemPath, showWarnings = TRUE, recursive = TRUE, mode = "0775")
+	}
+
+	## Prepare connection
+		samFileConn <- file(samFileName, "w+")
+
+	## with every thing ok write sample to disk
+		writeLines(sampleFile, samFileConn)
+
+	## Close all file connection
+	close(samFileConn)
+	close(conn)
+}
+
+##
+## Function to get sample documents with in a directory
+## input are same as function selectSample
+##
+
+makeSample <- function(directory,samplePath, sampleSize){
+
+	# Get the list of the files 
+		fList <- list.files(directory, full.names = TRUE)
+
+	# Select the files from the directory, get sample size and save to disk 
+		samlist <- lapply(fList, selectSample, sampleSize=sampleSize,samplePath=samplePath)
+		print("Sample docs are processed and wrote to disk.")
+}
+
+
+##
+## Sample the documents and save to disk with help of above defined function
+##
+
+	samplePath <- "/R/workspace/capstoneProject/dataset/final/sample/sam_"
+	sourcePath <- "/R/workspace/capstoneProject/dataset/final/en_US"
+	#makeSample(sourcePath, samplePath, 10)
+
+##
+## Preapare corpus
+##
+	corpusPath <- gsub("sam_","", samplePath)
+
+## View sample corups
+	#rawCorpusSummary(corpusPath)
+
+## Make Corpus
+	corpus.docs <- VCorpus(DirSource(corpusPath))
+	
+	
+##
+## With successful creation of corpus..
+## The following section deals with cleaning the corpus
+##
+
+## Change the case of words to lower
+	toLower <- function(corpus){
+		corpus <- tm_map(corpus,content_transformer(tolower))
+		return(corpus)
+	}
+
+corpus.docs <- toLower(corpus.docs)
+
+##
+## Handling contractions
+##
+## There are nummerous contractions used in english like i'll, i'm 
+## they are translated to i will, i am with helper functions mapFun and completeCase
+##
+
+	mapFun <- content_transformer(function(x, src, dest) {return (gsub(src, dest, x))})
+	
+	completeCase <- function(inputCorpus){
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="'ll", dest=" will")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="can't", dest="cannot")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="won't", dest="will not")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="'ve", dest=" have")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="n't", dest=" not")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="'m", dest=" am")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="`m", dest=" am")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="'d", dest=" had")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="'s", dest=" is")
+		inputCorpus <- tm_map(inputCorpus, mapFun, src="'re", dest=" are")
+		return (inputCorpus)
+	}
+	corpus.docs <- completeCase(corpus.docs)
+
+##
+## Removing unwanted symbols,numbers and punctuations
+##
+	toSpace <- content_transformer(function(x, pattern) gsub(pattern, " ", x))
+	corpus.docs <- tm_map(corpus.docs, toSpace, "(f|ht)tp(s?)://(.*)[.][a-z]+")
+	corpus.docs <- tm_map(corpus.docs, toSpace, "@[^\\s]+")
+	corpus.docs <- tm_map(corpus.docs, removePunctuation)
+	corpus.docs <- tm_map(corpus.docs, removeNumbers)
+
+##
+## Removing profanities
+##
+## The list with profanities is taken from 
+## https://github.com/shutterstock/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/blob/master/en
+## list of profanities
+profanities <- c("acrotomophilia", "anal", "anilingus", "arsehole", "ass", "asshole", "assmunch", 
+                 "bangbros", "bastinado", "bbw", "beastiality", "beaver", "bitch", "bj", "blowjob", "blumpkin", 
+                 "bollocks", "boner", "bukkake", "bulldyke", "bunghole", "butthole", 
+                 "camgirl", "camslut", "camwhore", "carpetmuncher", "circlejerk", "clusterfuck", "cock", "cocks", 
+                 "coprolagnia", "coprophilia", "cornhole", "cum", "cumming", "cummin", "cunt", 
+                 "darkie", "deepthroat", "dick", "dong", "fagot", "figging", "fisting", "footjob", "frotting", 
+                 "fuck", "fucking", "fuckin", "fucker", "f*ck", "f*cking", "f*ckin", "futa", "futanari", 
+                 "goatcx", "goatse", "gokkun", "goodpoop", "guro", 
+                 "handjob", "hardcore", "honkey", "homo", "hooker", "humping", 
+                 "jigaboo", "jiggaboo", "jiggerboo", "jizz", "kike", "kinbaku", "kinkster", 
+                 "milf", "muff", "nazi", "negro", "nigga", "nigger", 
+                 "omoroashi", "paedophile", "paedo", "pedo", "pedophile", "pegging", "pisspig", "ponyplay", 
+                 "poof", "porn", "porno", "pornography", "pornstar", "pussy", 
+                 "queaf", "raghead", "rape", "raping", "rapist", "rectum", "rimjob", "rimming", 
+                 "scat", "schlong", "scissoring", "semen", "sex", "sexo", "sexy", 
+                 "shemale", "shibari", "shit", "shota", "slanteye", "slut", "smut", "sodomize", "sodomizing", 
+                 "sodomy", "spooge", "strapon", "strapado", "suck", "sucks", "swastika", 
+                 "tits", "titt", "titties", "topless", "tosser", "towelhead", "tranny", "tubgirl", 
+                 "tush", "tushy", "twat", "upskirt", "urethra", "urophilia", "vagina", "vulva", 
+                 "wank", "wetback", "xx", "xxx", "yaoi", "yiffy", "zoophilia"
+                 )
+	corpus.docs <- tm_map(corpus.docs, removeWords, profanities)
+
+
+##
+## remove all words ending with org, com, edu, net
+##
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="[a-zA-Z0-9]+org", dest="")
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="[a-zA-Z0-9]+com", dest="")
+	
+##
+## Remove extraneous whitespaces
+##
+	corpus.docs <- tm_map(corpus.docs, stripWhitespace)
+
+##
+## remove words from french, spanish
+##
+	## corpus.docs <- tm_map(corpus.docs, mapFun, src="[a-zA-Z0-9]+[^a-zA-Z0-9\\s]+[a-zA-Z0-9]+", dest=" ")
+ 
+ 
+## 
+## remove words from chinese, japanse, korean
+## 
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="[^a-zA-Z0-9\\s]+", dest=" ")
+
+##
+## remove words with www*
+##
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="www[a-zA-Z0-9]+", dest=" ")
+
+
+##
+## stem words which start with twitter
+##
+
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="twitter[a-zA-Z0-9]+", dest="twitter")
+
+
+##
+## Function with perl
+##
+	gsubPerl <- content_transformer(function(data, input, output, perlSt=FALSE){
+		return (gsub(pattern = input, data, replacement = output, perl = perlSt))
+	})
+	
+##
+## stem haha
+## stem words starting with haha
+## 
+## stem remaning haha* as haha
+##
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(h+a+h+a)([a-zA-Z]*)", output="haha \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="hah[a-zA-Z0-9]+", dest="haha")
+
+##
+## handle more profanities
+##
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(f+u+c+k+)([a-zA-Z]*)", output=" ", perlSt=TRUE)
+
+##
+## stem facebook | face
+##
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="facebook[a-zA-Z0-9]+", dest="facebook")
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(f+a+c+e+)(?!bo|d|t|less|wa)([a-zA-Z]*)", output="face \\2", perlSt=TRUE)
+
+## 
+## Custom stemming
+##
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="(y+a+y+)[a-zA-Z]*", dest="yay")
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(a+l+r+e+a+d+y)([a-zA-Z]*)", output="already \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(a+l+m+o+s+t)([a-zA-Z]*)", output="almost \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(a+l+o+n+e+)([a-zA-Z]*)", output="alone \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(a+l+o+n+e+)([a-zA-Z]*)", output="alone \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(american)([a-zA-Z]*)", output="american \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(b+i+r+t+h+d+a+y+)([a-zA-Z]*)", output="birthday \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(b+i+r+t+h+)(?!ing|ed|stone|day)([a-zA-Z]*)", output="birth \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(y+o+u+)(?!r|ng|sel|th|tube)([a-zA-Z]*)", output="you \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(y+o+u+n+g+)(?!er|st)([a-zA-Z]*)", output="young \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(y+e+a+r+)(?!s|ning|ar|ne|ly)([a-zA-Z]*)", output="year \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(y+e+a+r+s)(?!o)([a-zA-Z]*)", output="years \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(l+o+v+e)(?!d|s|r)([a-zA-Z]*)", output="love \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(m+y+s+e+l+f+)([a-zA-Z]*)", output="myself \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(w+e+l+l+)(?!be|ne|ing|er|es|ed)([a-zA-Z]*)", output="well \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(w+h+a+t+)(?!s|ever|so|cha)([a-zA-Z]*)", output="what \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(o+k+a+y+)([a-zA-Z]*)", output="okay \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(a+l+l+)(?!ow|e|ia|y|ie|is|ah|oc|ot|ud|ig|ud|ag|st|en|ib|ic|us)([a-zA-Z]*)", output="all \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(b+o+o+k+)(?!ed|ing|er|ki|mar|ca|en|s)([a-zA-Z]*)", output="book \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(c+i+t+y+)(?!s|ish)([a-zA-Z]*)", output="city \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(f+o+o+d+)(?!s |ie|in)([a-zA-Z]*)", output="food \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(g+a+m+e+)(?!s |r |t |y |oft|sm)([a-zA-Z]*)", output="game \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(g+a+n+g+)(?!s |ste|ing|ed)([a-zA-Z]*)", output="gang \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(g+o+v+e+r+n+m+e+n+t+)(?!s |sth)([a-zA-Z]*)", output="government \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(g+r+e+a+t+)(?!est|er|nes|grand|shi)([a-zA-Z]*)", output="great \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(h+e+a+l+t+h+)(?!y|ier|car)([a-zA-Z]*)", output="health \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(l+o+n+g+)(?!er|est|ing|ev|ed|ran|itu|ue)([a-zA-Z]*)", output="long \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(l+o+n+g+e+s+t+)([a-zA-Z]*)", output="longest \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(l+o+w)(?!er|est|e |ell|ly|es)([a-zA-Z]*)", output="low \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(l+o+w+e+r+)(?!ed|y |s |ell|ly|es)([a-zA-Z]*)", output="lower \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(l+o+w+e+s+t+)(?!nes)([a-zA-Z]*)", output="lowest \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(m+o+n+e+y+)(?!bal|ed)([a-zA-Z]*)", output="money \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(m+u+c+h)(?!o |ach)([a-zA-Z]*)", output="much \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(m+u+s+i+c+)(?!al|ian|s |cal)([a-zA-Z]*)", output="music \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(m+u+s+i+c+ans)(?!ship)([a-zA-Z]*)", output="musician \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(n+i+g+h+t)(?!s |mare|ly|vis|fal|)([a-zA-Z]*)", output="night \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(o+f+t+e+n)([a-zA-Z]*)", output="often \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(o+f+t+)(?!he )([a-zA-Z]*)", output="often \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(o+f+t+e+n)([a-zA-Z]*)", output="often \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(o+f+t+)(?!he )([a-zA-Z]*)", output="often \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(online)([a-zA-Z]*)", output="online \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(orange)(?!s )([a-zA-Z]*)", output="orange \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(paper)(?!s |work|back|boy|less|base|clip|ed )([a-zA-Z]*)", output="paper \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(people)(?!s |ed)([a-zA-Z]*)", output="people \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(power)(?!ful|s |ed|hou|poin|ing|les|pla)([a-zA-Z]*)", output="power \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(problem)(?!at|sor)([a-zA-Z]*)", output="problem \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(p+s+h+)", output="psh", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(problem)(?!at|sor)([a-zA-Z]*)", output="problem \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(quick)(?!ly|er|est|ness|en)([a-zA-Z]*)", output="quick \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(read)(?!y|ing|er|ine|ath|abi)([a-zA-Z]*)", output="read \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(r+e+a+d+y+)([a-zA-Z]*)", output="ready \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(r+o+c+k+)", output="rock", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(sad)(?!ly|dle|de|ist|ne)([a-zA-Z]*)", output="sad \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(say)(?!ing|s)([a-zA-Z]*)", output="say \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(saying)([a-zA-Z]*)", output="saying \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(says)(?!so)([a-zA-Z]*)", output="says \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(say)(?!ing|s)([a-zA-Z]*)", output="say \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(school)(?!s |ed|ing|boy|child|teacher|er|kid|age|mem|rec|yard)([a-zA-Z]*)", output="school \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(sleep)(?!ing|y|les|s |er|ine|ove)([a-zA-Z]*)", output="sleep \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(s+o+)", output="so", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(success)(?!ful|es|or|ive|ion)([a-zA-Z]*)", output="success \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(successful)(?!ly)([a-zA-Z]*)", output="successful \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(t+a+l+k+)(?!ing|ed|ker|ati)([a-zA-Z]*)", output="talk \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(t+o+d+a+y+)([a-zA-Z]*)", output="today \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(two)([a-zA-Z]*)", output="two \\2", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(u+g+h+)", output="ugh", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(w+a+h+)", output="wah", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(w+a+y+)", output="way", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(x+o+x+o)([a-zA-Z]*)", output="xoxo", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(o+h+)", output="oh", perlSt=TRUE)
+	corpus.docs <- tm_map(corpus.docs, gsubPerl, input="(y+e+a+h)([a-zA-Z]*)", output="yeah \\2", perlSt=TRUE)
+
+##
+## Cleaning remaning words after custom stemming
+##
+	resudueWord <- c("ing","s","ers","ed","ly","l","ies","ue","ry","fi","ish","ndes","acha","nic","y",
+					"erbut","ie","li","ade","ding","o","k","ler","aam","dly","etzki","ke","ad","d",
+					"e","inz","yish","n","inbout")
+	corpus.docs <- tm_map(corpus.docs, removeWords, resudueWord)
+
+##
+##removing words with certain length i.e > 15
+##
+	corpus.docs <- tm_map(corpus.docs, mapFun, src="\\b[[:alpha:]]{15,}\\b", dest="")
+
+##
+## remove whitespaces the corpus
+##
+	corpus.docs <- tm_map(corpus.docs, stripWhitespace)
+
+	
+##
+## Stemming the corpus
+##
+## The words that have same origin need to stemmed as required
+##
+	corpus.docs <- tm_map(corpus.docs, stripWhitespace)
+	#corpus.docs <- tm_map(corpus.docs, stemDocument)
+	corpus.docs <- tm_map(corpus.docs, stripWhitespace)
+
+
+
+##
+## ngramTDM function takes input as corpus and creates ngram Term Document Matrix
+## start specifies the starting point for ngarm 
+## stop specifies the ending point for ngram
+## finally retruns term document matrix from start to stop
+##
+
+	ngramTDM <- function(corpus, start=NULL, stop=NULL){
+	## Handling the start and stop values
+		if(is.null(start) & is.null(stop)){
+			start <- 1
+			stop <- 1
+		}
+		else if (is.null(start) & !is.null(stop)){
+			start <- 1
+		}
+		else if (!is.null(start) & is.null(stop)){
+			stop <- start
+		}
+		else {
+			if(stop < start){
+				print("Stop value is lesser than start.")
+			}
+	}
+	
+	## Creating tokenizer handle
+	ngramTokenizer <- function(x) NGramTokenizer(x, Weka_control(min=start, max=stop))
+	
+	## Create term document matrix 
+	tdm <- TermDocumentMatrix(corpus, control = list(tokenize = ngramTokenizer))
+	return(tdm)
+	}
+
+
+##
+## Function to get the Term Frequency Matrix
+## tdm : input as Trem Document Matrix
+## threshold : number of unique terms to be in TFM
+## index : whenever true splits the term and get last term in TFM
+## sparsity : lowest bound frquency count for term
+##
+## return : Term frequency matrix ordered by frequency of term
+##
+
+	getTermFreq <- function(tdm, threshold=NULL, index=TRUE, sparsity=0){
+		freqTerm <- rowSums(as.matrix(tdm))
+		oraIndex <- order(freqTerm, decreasing = TRUE)
+		if(is.null(threshold)){
+			data <- melt(freqTerm[oraIndex])
+		}
+		else {
+			data <- melt(head(freqTerm[oraIndex], threshold))
+		}
+		remove(freqTerm)
+		gc()
+		data$term <- dimnames(data)[[1]]
+		if(index){
+		data$lastWord <- gsub( ".* ", "", data$term)
+		}
+		return(data[data$value > sparsity, ])
+	}
+
+
+##
+## Function to save the computed values in Disk
+##
+## data : data to save
+## directory : absolute directory path
+## fileName : file name to save
+##
+## If filename is missing it takes the variable name of the data.
+##
+
+	saveToFile <- function(data, directory, fileName=NULL){
+		if(is.null(fileName)){
+			fileName <- paste0(deparse(substitute(data)), ".RData")
+		}
+	
+		if(!dir.exists(directory)){
+			print(paste0("Directory ",directory," does not exists."))
+			stopifnot(FALSE)
+		}
+		
+		saveRDS(data, paste0(directory, fileName))
+		print(paste0("Data : ", deparse(substitute(data)), " saved in : ",directory," with filename : ", fileName))
+	}
+
+
+
+##
+## Set directory to save future computed values:
+##
+
+	savePath <- "/R/workspace/capstoneProject/dataset/final/RData/10percent/"
+
+##
+## Calculate unigram TDM and TFM
+##
+
+	corpus.uniTDM <- ngramTDM(corpus.docs)
+	uniTFM <- getTermFreq(corpus.uniTDM, index=FALSE,sparsity=1)
+	saveToFile(corpus.uniTDM, savePath)
+	saveToFile(uniTFM, savePath)
+	rm(corpus.uniTDM)
+	rm(uniTFM)
+
+
+##
+## Calculate bigram TDM and TFM
+##
+
+	corpus.biTDM <- ngramTDM(corpus.docs,2)
+	biTFM <- getTermFreq(corpus.biTDM, index=TRUE,sparsity=2)
+	saveToFile(corpus.biTDM, savePath)
+	saveToFile(biTFM, savePath)
+	rm(corpus.biTDM)
+	rm(biTFM)
+
+
+##
+## Calculate trigram TDM and TFM
+##
+
+	corpus.triTDM <- ngramTDM(corpus.docs,3)
+	triTFM <- getTermFreq(corpus.triTDM, index=TRUE,sparsity=1)
+	saveToFile(corpus.triTDM, savePath)
+	saveToFile(triTFM, savePath)
+	rm(corpus.triTDM)
+	rm(triTFM)
+
+
+##
+## Calculate fourgram TDM and TFM
+##
+
+	corpus.fourTDM <- ngramTDM(corpus.docs,4)
+	fourTFM <- getTermFreq(corpus.fourTDM, index=TRUE,sparsity=1)
+	saveToFile(corpus.fourTDM, savePath)
+	saveToFile(fourTFM, savePath)
+	rm(corpus.fourTDM)
+	rm(fourTFM)
+	gc()
+
+
+##
+## Load the computed value back by reloading the saved files:
+##
+## the loaded files variable names will be the respective filename they were saved
+## omitting the file extention .RData
+##
+
+	setwd(savePath)
+	#documents <- grep('^cor.*',dir(),value=T)
+	documents <- dir()
+	setwd(savePath)
+	
+	for (i in 1: length(documents)){
+		varname <- sub(".RData", "",documents[i])
+		assign(paste(varname),readRDS(documents[i]))
+		print(paste0("Loaded: ",documents[i]))
+	}
+
+getNextTerm <- function(findTerm, clusterSize){
+ptm <- proc.time()
+stringLen <- length(strsplit(findTerm, "\\s+")[[1]])
+
+## looping for backoff
+while(stringLen >= 0) {
+
+	## Initialize the prediction vector
+		predicWord <- vector()
+		
+		## Look in 4-gram if given word is 3-gram
+			if(stringLen >= 3){
+				predicWord <- fourTFM %>% filter(str_detect(term,findTerm)) %>% select(lastWord)
+				print(paste0("I am of length:", stringLen))
+			}
+			
+		## Look in 3-gram if given word is 2-gram
+			else if (stringLen >= 2){
+				predicWord <- triTFM %>% filter(str_detect(term,findTerm)) %>% select(lastWord)
+				print(paste0("I am of length:", stringLen))
+			}
+			
+		## Look in 2-gram if given word is 1-gram
+			else if (stringLen >= 1){
+				predicWord <- biTFM %>% filter(str_detect(term,findTerm)) %>% select(lastWord)
+				print(paste0("I am of length:", stringLen))
+			}
+			
+		## if no match found on any n-gram model randomly select 5 words from uniGram
+			else{
+				predicWord <- sample(uniTFM$term,5)
+				print("I am of length:0")
+				break
+			}
+		
+		## predicted words are 0 then back-off
+			if(length(predicWord$lastWord) < 1){
+				## Decrease the string length 
+				stringLen <- stringLen - 1	
+				
+				## Truncate the first term
+				findTerm <- sub(".*? (.+)", "\\1",findTerm)
+			}
+			else{
+				if(length(predicWord$lastWord) > 5){
+				predicWord <- head(predicWord$lastWord,clusterSize)
+				break
+				}
+				
+				## retrun the toatl matched if less than 5 also
+				else{
+				break
+				}
+			}
+	}
+	print("=================")
+	print("Total Time Taken :")
+	print(ptm <- proc.time())
+	print("=================")
+	
+	## Finally return the words.
+	return(predicWord)	
+}	
