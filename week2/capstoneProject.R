@@ -13,7 +13,25 @@
 
 	dir("/R/workspace/capstoneProject/dataset/final/en_US")
 
-
+	
+	saveToFile <- function(data, directory, fileName=NULL){
+		if(is.null(fileName)){
+			fileName <- paste0(deparse(substitute(data)), ".RData")
+		}
+	
+		if(!dir.exists(directory)){
+			print(paste0("Directory ",directory," does not exists."))
+			stopifnot(FALSE)
+		}
+		
+		saveRDS(data, paste0(directory, fileName))
+		print(paste0("Data : ", deparse(substitute(data)), " saved in : ",directory," with filename : ", fileName))
+	}
+	
+	
+	myDataSaveDir <- '/R/workspace/capstoneProject/ds-capstone-project/saveRData'
+	savePath <- "/R/workspace/capstoneProject/dataset/final/sample/RData/"	
+	
 ##
 ## Function to view the attributes of the document in give directory
 ## inputfile : name of the file
@@ -80,7 +98,9 @@
 ##
 #### VIEW DOCUMENTS ATTRIBUES
 
-#	print(rawCorpusSummary("/R/workspace/capstoneProject/dataset/final/en_US"))
+rawCorpusSumm <- rawCorpusSummary("/R/workspace/capstoneProject/dataset/final/en_US")
+saveToFile(rawCorpusSumm, savePath)
+#saveToFile(rowCorpusSumm, myDataSaveDir)
 
 ##
 ## Function to sample the lines on each document. As huge files can't be handled easily by normal PC.
@@ -91,7 +111,7 @@
 ##
 
 ## Set the seed for reproducibility
-	set.seed(2017)
+	set.seed(1990)
 
 	selectSample <- function(file, sampleSize, samplePath, trainSize=80){
 		
@@ -192,7 +212,7 @@
 
 	samplePath <- "/R/workspace/capstoneProject/dataset/final/sample/"
 	sourcePath <- "/R/workspace/capstoneProject/dataset/final/en_US"
-	makeSample(sourcePath, samplePath,sampleSize=10)
+	makeSample(sourcePath, samplePath,sampleSize=8)
 
 ##
 ## Make corpus for traning and testing data
@@ -204,6 +224,10 @@
 	trainCorpus <- VCorpus(DirSource(trainPath))
 	testCorpus <- VCorpus(DirSource(testPath))
 
+	trainCorSumm <- rawCorpusSummary(trainPath)
+	saveToFile(trainCorSumm, savePath)
+	testCorSumm <- rawCorpusSummary(testPath)
+	saveToFile(testCorSumm, savePath)
 ##
 ## Function to clean the corpus
 ##
@@ -845,22 +869,23 @@
 	print(getNgramPP(testCorpus,uniTFM,biTFM,triTFM))
 	print(getNgramPP(testCorpus,uniTFM,biTFM,triTFM,2))
 	print(getNgramPP(testCorpus,uniTFM,biTFM,triTFM,3))
+	
 
 #
 #
-###
-### Load the computed value back by reloading the saved files:
-###
-### the loaded files variable names will be the respective filename they were saved
-### omitting the file extention .RData
-###
-#
-#	setwd(savePath)
-#	documents <- grep('^cor.*',dir(),value=T)
-#	setwd(savePath)
-#	
-#	for (i in 1: length(documents)){
-#		varname <- sub(".RData", "",documents[i])
-#		assign(paste(varname),readRDS(documents[i]))
-#		print(paste0("Loaded: ",documents[i]))
-#	}
+####
+#### Load the computed value back by reloading the saved files:
+####
+#### the loaded files variable names will be the respective filename they were saved
+#### omitting the file extention .RData
+####
+##
+##	setwd(savePath)
+##	documents <- grep('^cor.*',dir(),value=T)
+##	setwd(savePath)
+##	
+##	for (i in 1: length(documents)){
+##		varname <- sub(".RData", "",documents[i])
+##		assign(paste(varname),readRDS(documents[i]))
+##		print(paste0("Loaded: ",documents[i]))
+##	}

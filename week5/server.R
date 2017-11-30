@@ -6,17 +6,19 @@ library("dplyr")
 
 
 shinyServer(function(input, output, session){
+  options(shiny.maxRequestSize=50*1024^2)
   ##source('/R/workspace/capstoneProject/ds-capstone-project/week2/improvedPrediction.R')
   ##
   ## Loading the computed ngram models
   ##
   datadir <- "/R/workspace/capstoneProject/dataset/final/sample/RData/"
 
-  ngTDM <- grep('*TFM.RData$',dir(datadir), value=T)
+  ngTDM <- grep('*TFM.RData$',dir(), value=T)
+  cat(ngTDM)
   
   for (i in 1: length(ngTDM)){
       varname <- sub(".RData", "",ngTDM[i])
-      assign(paste(varname),readRDS(paste0(datadir,ngTDM[i])))
+      assign(paste(varname),readRDS(ngTDM[i]))
       print(paste0("Loaded: ",ngTDM[i]))
     }
   uniTFM <- uniTFM[,2:1]
@@ -105,6 +107,7 @@ shinyServer(function(input, output, session){
       inputText <- input$textArea
     }
     
+    inputText <- gsub("\\s+", " ", inputText)
     inputText <- trimws(inputText)
     inputText <- tolower(inputText)
     inputText <- gsub("[[:punct:]]","",inputText)
@@ -113,6 +116,9 @@ shinyServer(function(input, output, session){
     inputText
   })
   
+  obsList <- list()
+  
+  ###
   output$words <- renderUI({
     predictCount <- input$wordCloud
     predicWord <- getNextTerm(modelpred(), predictCount)
@@ -127,10 +133,12 @@ shinyServer(function(input, output, session){
     predicWord <<- predicWord[1:predictCount,]
     buttons <- as.list(1:length(predicWord[,1]))
     buttons <- lapply(buttons, function(i) {
-        actionButton(paste0(predicWord[i,1],i),paste(predicWord[i,1]))
+      actionButton(paste0(predicWord[i,1],i),paste(predicWord[i,1]))
     }
     )
   })
+  
+  ###
   
   output$plot1 <- renderPlot({
     predictCount <- input$wordCloud

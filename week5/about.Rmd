@@ -1,22 +1,22 @@
+## Getting Started with Shiny App
+The shiny app interface is user friendly and easy to use. Please refer to the follwoing steps for App usage.
+
+1. Click the prediction tab (By default prediction tab will be selected, if not select prediction tab to view result).
+
+2. Type your intput text in textarea below label "Start typing.."
+
+3. With your input the App preprocess the input text and submit to alogrithm which predicts the words and predicted words can be viewed in section "Predicted Word"
+
+4. If you want to adjust your word suggestion count adjust the slider as per your need, min and max count for word suggestion are 3 and 10 respectively.
+
+5. View the predicted words in wordcloud in section below "Your text"
+
+The follwoing picture demonstates the workflow.
+
 ---
-title: "Predicted Tooth Growth in Guinea Pigs"
-author: "Suman Adhikari"
-date: "July 14, 2017"
-output: html_document
+
+![Shiny App](shiny-app.png) 
+
 ---
 
-### Introduction
-Welcome to the "APP Predicted Tooth Growth in Guinea Pigs", that is developed as part of Developing Data Products Course from Coursera.
-
-It is a very basic APP that demonstrates basic skills learned during the course.
-
-The app uses the dataset "ToothGrowth" from R dataset.
-
-### Getting Started with this Web App
-One Side of the App let's you to select the variables i.e the dose level of Vitamin C and other the way the Vitamin was provided to Pigs.
-
-First a model is build and the model is used for predicting the tooth data selected by the end user.
-
-Please select/change the respective Inpput variables to view the change.
-
-Source code for ui.R and server.R files are available on the GitHub.
+Source code  for the complete Project can be found on [GitHub](https://github.com/dralmostright/ds-capstone-project).

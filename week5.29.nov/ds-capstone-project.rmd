@@ -1,0 +1,122 @@
+
+## Abstract
+Around the world, people are spending an increasing amount of time on their mobile devices for email, social networking, banking and a whole range of other activities. But typing on mobile devices can be a serious pain. Hence in this Coursera DataScience Specialization Capstone Project I am motivated to address the problem by starting with analyzing a large corpus of text documents to discover the structure in the data and how words are put together, then sampling and building a predictive text model.
+
+In this stage i am combining all models and developing data products using Shiny APP and summarizing the overall process.
+
+## Load the required libraries
+The necessary packages for processing documents/corpus, exploratory analysis and bulding model are loaded.
+```{r, message=FALSE, results='hide'}
+libs <- c("ggplot2","tm","SnowballC","reshape2","RWeka","dplyr")
+lapply(libs ,require, character.only=TRUE)
+```
+
+## Load the Data
+Data used for this Capstone Project was obtained from the below URL:
+
+* [Data Set](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip)
+
+The data had been already download to working directory and extracted. We will be using the English Language documents for our analysis as other language are also available.
+
+
+## Exploratory Data Analysis-I and Sampling Data 
+Before starting to clean data, lets first analyze the few attributes of the data i.e size, no. of lines etc.
+
+![Raw Data Summary](rawCor.png)
+
+
+The documents we were going to use were big, as we obeserved above. Hence processing of those whole documents in normal PC takes siginificant time and leads memory erros. Hence, we had sample  the document with 10% of original and proceed using random sampling algorithm.
+
+With The samples being processed and wrote back to disk using the attributes fo sample i.e size, word lenght etc were as:.
+
+Train Data Summary
+![Train Data Summary](rawCortrain.png)
+
+---
+
+Test Data Summary
+
+![Test Data Summary](rawtest.png)
+
+
+As we saw our sample was good enough to handle by normal PC. So next we proceed to build our [Courpus](https://en.wikipedia.org/wiki/Text_corpus).
+
+## Getting and Cleaning Data
+
+The documents that had been used were from various sources like twitter, blog and news. The documents consists of various flaws and profanity like unwanted symbols, contractions, stop words, bad words. Hence our first step was to handle them properly. The tasks we had proformed as part of cleaning text are listed below in bold:
+
+ * **Changing the case of corpus**
+ * **Removing the contractions**
+ * **Removing numbers and punctuations**
+ * Removing stop words and bad words 
+ * **Removing unwanted white spaces**
+ * Stemming the corpus
+
+We had used tm and quanteda packages and their functions to clean the data. 
+
+
+### Change the case of words to lower
+As R is case sensitive, we need to convert the case of whole corpus as *Case* is not equal to *case*.
+However, there is a tolower transformation, it is not a part of the standard tm transformations. For this reason, we had to convert tolower into a transformation that can handle a corpus object properly by using content_transformer.
+
+
+### Handling contractions
+Words like I'll, I'm i.e contractions are heavily used in english as they represent two words. Hence to fix such condition we had developed a function *completeCase* which splits the words 'i'll' to 'i will', 'i'am' to 'i am' etc.
+
+### Removing unwanted symbols,numbers and punctuations
+In this step all the unwanted symbols and urls like http, @, # were removed. 
+
+
+### Removing bad words and stop words.
+As We are imitating natural language, so its better to keep the stop words. As removing stop word may make our model more worse.
+
+### Remove extraneous whitespaces
+All extraneous whitespaces are removed using the stripWhitespace transformation:
+
+
+## Exploratory Data Analysis - II
+After developing tidy and clean corpus our next step was exploring the corpus for distribution of terms and their frequency and n-grams (An n-gram is a contiguous sequence of n items from a given sequence of text or speech. The items can be phonemes, syllables, letters, words or base pairs according to the application [Source : [en.wikipedia.org](https://en.wikipedia.org/wiki/N-gram)]). So in our case items are words. We had use [Term Document Matrix](https://en.wikipedia.org/wiki/Document-term_matrix) for exploring corpus i.e rows represent the document and columns represent terms that appeared in the respective documents.
+
+### Creating Term Document matrix
+With preprocessing we had changed the text to quantitative for further analysis using Term Document Matrix(TDM). We had generated TDM for up to 4-gram.
+
+
+After creating Term document matrix we were interested in Term frequency for each ngarm TDM. We had used *getTermFreq* user defined function for calculating TFM, which takes the ngram TDM and retruns Term frequency matrix i.e rows in matrix are terms and columns are frequency. 
+
+
+### Mining the TDM
+After transforing text to a mathemetical object and next it was analyzed using quantitative measures.
+For example, to get the frequency of occurrence of each word in the corpus, We simply sum over all rows to give column sums.
+
+First let's visualize unigram in plot.
+
+![UniGram](uniGram.png)
+
+It wasclearly witnessed form above plot that most frequent words are stop words. As stated earlier we had not removed stop words as we were imitating the NLP. Hence removing stop word may make our model more worse.
+
+Then bigram, trigram and 4-gram term frequency matrix were analyzed.
+![BiGram](biGram.png) 
+
+
+---
+
+![TriGram](triGram.png) 
+
+
+---
+
+![FourGram](fourGram.png) 
+
+## Prediction Perplexity, Accuracy and Response Time.
+Perplexity for each n-garms were calculated against the test data and can be viewed as below:
+
+![Perplexity](perPlex.png) 
+
+To decrease the response time we had removed the N-Gram with frequency less than 2. To ehance the accuracy of the model the joined words were separated, more advanced cleaning of data was done. And the average response time of the model is less than 1 sec.
+
+## Prediction Algorithm
+- We had used N-gram model with stupid back-off strategy for final prediction algorithm.
+  - i.e take n-gram input and search in (n+1)-gram model if no match found backoff to n-gram model, similar approach is carried out until a match is found and if still no match found, retrun top unigram words.
+
+## Appendix
+The source code of whole capstone project can be found on [Github](https://github.com/dralmostright/ds-capstone-project)

@@ -1,0 +1,10 @@
+name: data_science_capstone_project_shiny_app
+title: Data Science Capstone Project Shiny App
+account: dralmostright
+server: shinyapps.io
+appId: 241551
+bundleId: 1106041
+url: https://dralmostright.shinyapps.io/data_science_capstone_project_shiny_app/
+when: 1512034531.02538
+asMultiple: FALSE
+asStatic: FALSE
